@@ -268,6 +268,13 @@ def other_people_summary(request):
     :param request: a request object used to generate the HttpResponse
     :return: an HttpResponse object with the rendered People in your home: summary template
     """
+
+    def __create_child_not_in_the_home_table(child):
+        child_table = __create_child_table(child)
+        child_table['table_object'].other_people_numbers = '&children=' + str(child.child) + '&remove=0'
+
+        return child_table
+
     if request.method == 'GET':
         application_id_local = request.GET["id"]
         adults_list = AdultInHome.objects.filter(application_id=application_id_local).order_by('adult')
@@ -377,7 +384,7 @@ def other_people_summary(request):
         child_table_list = create_tables(child_table_list, other_child_name_dict, other_child_link_dict)
 
         # Populating Children not in the Home:
-        children_not_in_the_home_table_list = [__create_child_table(child) for child in children_not_in_the_home_list]
+        children_not_in_the_home_table_list = [__create_child_not_in_the_home_table(child) for child in children_not_in_the_home_list]
         children_not_in_the_home_table = create_tables(children_not_in_the_home_table_list,
                                                        child_not_in_the_home_name_dict, child_not_in_the_home_link_dict)
 
@@ -388,14 +395,14 @@ def other_people_summary(request):
         adult_table = collections.OrderedDict({
             'table_object': Table([application_id_local]),
             'fields': {'adults_in_home': adults_in_home},
-            'title': 'Adults in your home',
+            'title': 'Adults in the home',
             'error_summary_title': 'There was a problem'
         })
 
         child_table = collections.OrderedDict({
             'table_object': Table([application_id_local]),
             'fields': {'children_in_home': children_in_home},
-            'title': 'Children in your home',
+            'title': 'Children in the home',
             'error_summary_title': 'There was a problem'
         })
 
@@ -421,15 +428,18 @@ def other_people_summary(request):
         sending_emails = application.adults_in_home is True and any(
                 [adult.email_resent_timestamp is None for adult in adults_list])
 
+        num_children_not_in_home = len(Child.objects.filter(application_id=application_id_local))
+
         variables = {
-            'page_title': 'Check your answers: people in your home',
+            'page_title': 'Check your answers: people in the home',
             'form': form,
             'application_id': application_id_local,
             'table_list': table_list,
             'turning_16': application.children_turning_16,
             'people_in_home_status': application.people_in_home_status,
             'display_buttons_list': display_buttons_list,
-            'sending_emails': sending_emails
+            'sending_emails': sending_emails,
+            'num_children_not_in_home': num_children_not_in_home
         }
         variables = submit_link_setter(variables, table_list, 'people_in_home', application_id_local)
 
@@ -442,6 +452,9 @@ def other_people_summary(request):
         # If reaching the summary page for the first time
         if application.people_in_home_status == 'IN_PROGRESS' or application.people_in_home_status == 'WAITING':
             adults_list = AdultInHome.objects.filter(application_id=application_id_local).order_by('adult')
+            if any(adult.health_check_status == 'To do' for adult in adults_list):
+                status.update(application_id_local, 'people_in_home_status', 'WAITING')
+
             if application.adults_in_home is True and any(
                     [adult.email_resent_timestamp is None for adult in adults_list]):
                 status.update(application_id_local, 'people_in_home_status', 'WAITING')
@@ -452,7 +465,6 @@ def other_people_summary(request):
                 return HttpResponseRedirect(reverse('Task-List-View') + '?id=' + application_id_local)
             else:
                 return HttpResponseRedirect(reverse('Task-List-View') + '?id=' + application_id_local)
-
         else:
             return HttpResponseRedirect(reverse('Task-List-View') + '?id=' + application_id_local)
 

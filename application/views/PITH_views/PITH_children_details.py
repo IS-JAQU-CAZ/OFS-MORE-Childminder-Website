@@ -158,17 +158,14 @@ class PITHChildrenDetailsView(View):
                 }
                 return render(request, 'other-people-children-details.html', variables)
 
+
     def get_success_url(self, children_turning_16, application):
         """
         Function containing logic for determining success_url.
 
         :param: children_turning_16: bool indicating whether or not any children were turning 16.
         :param: application: application object for the applicant.
-        :return: reversable string for redirect target page.
-
-        If a child is approaching 16, navigate to approaching 16 page.
-        If no child is approaching 16 AND applicant IS providing care in own home, navigate to own children page.
-        If no child is approaching 16 AND applicant NOT providing care in own home, navigate to summary page.
+        :return: reversible string for redirect target page.
         """
         adults = AdultInHome.objects.filter(application_id=application.pk)
 

@@ -41,9 +41,10 @@ class PITHOwnChildrenDetailsView(View):
 
         if application.application_status == 'FURTHER_INFORMATION':
             for index, form in enumerate(form_list):
-                form.error_summary_template_name = 'returned-error-summary.html'
-                form.error_summary_title = "There was a problem with Child {0}'s details".format(str(index + 1))
-                form.check_flag()
+                if form.pk != '':  # If there are no children in the database yet, there will be no pk for the child.
+                    form.error_summary_template_name = 'returned-error-summary.html'
+                    form.error_summary_title = "There was a problem with Child {0}'s details".format(str(index + 1))
+                    form.check_flag()
 
         variables = {
             'form_list': form_list,
@@ -77,12 +78,13 @@ class PITHOwnChildrenDetailsView(View):
 
         for i in range(1, int(number_of_children) + 1):
             form = PITHOwnChildrenDetailsForm(request.POST, id=application_id_local, child=i, prefix=i)
-            # form.remove_flag()
             form.error_summary_title = 'There was a problem with Child {0}\'s details'.format(str(i))
-            form_list.append(form)
 
             if application.application_status == 'FURTHER_INFORMATION':
                 form.error_summary_template_name = 'returned-error-summary.html'
+                form.remove_flag()
+
+            form_list.append(form)
 
             if form.is_valid():
                 child_record = PITH_own_children_details_logic(application_id_local, form, i)
@@ -109,12 +111,11 @@ class PITHOwnChildrenDetailsView(View):
                     'people_in_home_status': application.people_in_home_status,
                 }
 
-                success_url = self.get_success_url(application)
                 application.date_updated = current_date
                 application.save()
                 reset_declaration(application)
-                return HttpResponseRedirect(build_url(success_url, get={'id': application_id_local,
-                                                                        'child': 1}))
+                return HttpResponseRedirect(build_url('PITH-Own-Children-Postcode-View', get={'id': application_id_local,
+                                                                                              'children': 1}))
 
             # If there is an invalid form
             else:
@@ -159,18 +160,3 @@ class PITHOwnChildrenDetailsView(View):
                     'people_in_home_status': application.people_in_home_status
                 }
                 return render(request, 'PITH_templates/PITH_own_children_details.html', variables)
-
-    def get_success_url(self, application):
-        adults = AdultInHome.objects.filter(application_id=application.pk)
-        home_address = ApplicantHomeAddress.objects.get(application_id=application.pk, current_address=True)
-        childcare_address = ApplicantHomeAddress.objects.get(application_id=application.pk, childcare_address=True)
-
-        if home_address == childcare_address:
-            success_url = 'PITH-Own-Children-Postcode-View'
-        else:
-            if len(adults) != 0 and any(not adult.capita and not adult.on_update for adult in adults):
-                success_url = 'Task-List-View'
-            else:
-                success_url = 'PITH-Summary-View'
-
-        return success_url
